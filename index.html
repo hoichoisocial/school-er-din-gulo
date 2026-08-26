@@ -142,6 +142,8 @@
   #tv-screen{ position:fixed; z-index:1; opacity:0; transition:opacity .5s ease; overflow:hidden; border-radius:11px; pointer-events:none;
     box-shadow:0 0 46px -6px rgba(244,206,134,.38); }
   #tv-screen iframe{ display:block; }
+  .tv-bug{ position:absolute; top:5.5%; right:5%; width:17%; height:auto; z-index:3;
+    opacity:.92; filter:drop-shadow(0 1px 3px rgba(0,0,0,.55)); pointer-events:none; }
   #amb-rain,#amb-crows{ position:fixed; left:-10000px; top:0; width:320px; height:180px; pointer-events:none; }
   .crt-fx{ position:absolute; inset:0; pointer-events:none; border-radius:11px;
     background:
@@ -187,17 +189,17 @@
   <div class="nowbar" id="nowbar"><b id="np-track"></b><span id="np-artist"></span></div>
 
   <div id="captions" aria-live="polite"></div>
-  <div id="tv-screen" aria-hidden="true"><div id="yt-frame"></div><div class="crt-fx"></div></div>
+  <div id="tv-screen" aria-hidden="true"><div id="yt-frame"></div><img class="tv-bug" src="images/sb-logo.png" alt=""><div class="crt-fx"></div></div>
 
   <!-- how-it-works overlay -->
   <div class="overlay" id="overlay">
     <div class="card">
       <button class="x" id="overlay-close" aria-label="Close">×</button>
       <h3>কীভাবে কাজ করে</h3>
-      <p>The song plays on the TV via YouTube — nothing is hosted. Everything else — the street, the room, মা — is a live soundscape mixed in the browser, so it works on your phone too.</p>
-      <p>Pick a <b>বেলা</b> — সকাল, দুপুর, or রাত — to set the time of day, then tap the sound chips to build your own mix: শাঁখ, cooker and birds for a morning; the fan, cicadas and a stray cycle bell for a sleeping afternoon; rain, storm and thunder for night. মা's calls land in the gaps between songs.</p>
-      <p>Right now every ambient sound is generated live as a draft; real recordings and মা's actual voice drop into the same slots later. <em>মা's voice can't be stock — that's the whole point.</em></p>
-      <p style="margin-top:18px;font-family:'PT Mono',var(--mono);font-size:11px;color:var(--ivory-dim);">a hoichoi joint · Sangeet Bangla-era music, played the way it lived.</p>
+      <p>একটা গান। একটা সময়। আর তার সঙ্গে জুড়ে থাকা সেই চেনা পৃথিবীটা।</p>
+      <p>প্রথমে বেছে নিন আপনার বেলা: সকাল, দুপুর, নাকি রাত। তারপর নিজের মতো করে সাজিয়ে নিন সেই সময়টার শব্দগুলো। শাঁখের আওয়াজ, cooker-এর সিটি, পাখির ডাক, ঘুরতে থাকা fan, ঝিঁঝিঁ পোকা, দূরের cycle bell, বৃষ্টি, ঝড় যা শুনলেই মনে পড়ে যায় সেই দিনগুলো।</p>
+      <p>গান চলবে, atmosphere তৈরী হবে, আর ফিরে আসবে ফেলে আসা কিছু স্মৃতি।</p>
+      <p>So, চোখ বন্ধ করে হারিয়ে যান!</p>
     </div>
   </div>
 
@@ -246,7 +248,15 @@ const NIGHT_SONGS = [
   { id: "gi3mnl8lavM", title: "Eta Ki Bhul",             artist: "Shaan, Monali Thakur" },
   { id: "D2XymZmjaus", title: "Jamai 420",               artist: "Prasenjit Mallick, Bob Stephen, Gopika Goswami" },
 ];
-function songsForMode(mode){ if(mode==="night") return NIGHT_SONGS; if(mode==="day") return DAY_SONGS; return SONGS; }
+/* a break that drops in every few songs, like an ad break on the channel */
+const BREAK = { id:"eAAZZbJcun0", title:"বিজ্ঞাপন বিরতি", artist:"" };
+const BREAK_EVERY = 3;
+function withBreaks(list){ const out=[];
+  list.forEach((s,i)=>{ out.push(s); if((i+1)%BREAK_EVERY===0 && i<list.length-1) out.push(BREAK); });
+  return out; }
+function songsForMode(mode){
+  const base = mode==="night" ? NIGHT_SONGS : mode==="day" ? DAY_SONGS : SONGS;
+  return withBreaks(base); }
 
 /* ════════════════════════════════════════════════════════════════════════
    ⬇  SOUND REGISTRY  ⬇
@@ -446,13 +456,13 @@ class YouTubeMusic {
           if(e.data===YT.PlayerState.ENDED){ this.amb.setGap(true); this.cbState("gap"); clearTimeout(this._gap); this._gap=setTimeout(()=>this._go(this.i+1), 5000); }
           else if(e.data===YT.PlayerState.PLAYING){ this._errCount=0; this.amb.setGap(false); this.cbState("playing"); this._emit(); if(window.__placeTV) window.__placeTV(); } },
         onError: e=>{ this._err(e&&e.data); } } }); }
-  _emit(){ const s=this.songs[this.i]||{}; this.cbTrack({ title:s.title||"—", artist:s.artist||"", id:s.id }); }
+  _emit(){ const s=this.songs[this.i]||{}; this.cbTrack({ title:s.title||"...", artist:s.artist||"", id:s.id }); }
   _go(n){ if(!this.songs.length) return; clearTimeout(this._gap); this.i=((n%this.songs.length)+this.songs.length)%this.songs.length; this._emit(); this.yt.loadVideoById(this.songs[this.i].id); }
   _err(code){ this._errCount=(this._errCount||0)+1; const s=this.songs[this.i]||{};
     const why=(code===101||code===150)?"this upload blocks embedding":(code===100)?"video unavailable / removed":(code===2)?"bad video id":"playback blocked here";
     this.amb.setGap(true); this.cbState("gap");
-    if(this._errCount>=this.songs.length){ this.cbTrack({ title:"গান চলছে না এখানে", artist:"needs a real web address — see the note", id:"" }); return; }
-    this.cbTrack({ title:(s.title||"—")+"  ·  skipped", artist:why, id:s.id }); clearTimeout(this._gap); this._gap=setTimeout(()=>this._go(this.i+1), 1800); }
+    if(this._errCount>=this.songs.length){ this.cbTrack({ title:"গান চলছে না এখানে", artist:"needs a real web address, see the note", id:"" }); return; }
+    this.cbTrack({ title:(s.title||"...")+"  ·  skipped", artist:why, id:s.id }); clearTimeout(this._gap); this._gap=setTimeout(()=>this._go(this.i+1), 1800); }
   _pollStart(){ clearInterval(this.poll); this.poll=setInterval(()=>{ if(!this.yt||!this.yt.getDuration) return; const d=this.yt.getDuration()||0, c=this.yt.getCurrentTime()||0; if(d>0) this.cbProg({ratio:c/d,cur:c,dur:d}); }, 300); }
   onTrack(cb){this.cbTrack=cb;} onProgress(cb){this.cbProg=cb;} onState(cb){this.cbState=cb;}
   setVolume(v){ this.vol=clamp01(v); if(this.yt&&this.yt.setVolume) this.yt.setVolume(Math.round(this.vol*100)); }
@@ -541,7 +551,7 @@ $("vol-music").addEventListener("input",e=>{ if(music) music.setVolume(e.target.
 })();
 
 /* bring the song layer up early so playback can begin on the first click */
-if(SONGS.filter(validId).length===0){ showSongMsg("গান যোগ করো","SONGS লিস্টে YouTube id বসাও — ⓘ দেখো"); }
+if(SONGS.filter(validId).length===0){ showSongMsg("গান যোগ করো","SONGS লিস্টে YouTube id বসাও, ⓘ দেখো"); }
 else {
   loadYT();
   ytReady.then(()=>{ music=new YouTubeMusic(amb, songsForMode(currentMode)); window.__music=music; window.__amb=amb; amb.onAmbient=ms=>{ if(music) music.duckFor(ms); }; wireMusic(); music.setVolume($("vol-music").value/100); music.mount(); });
